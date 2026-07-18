@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>粉丝社群平台 - 数据库 ER 图</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #00d4ff;
+            margin-bottom: 10px;
+            font-size: 1.8rem;
+        }
+        .subtitle {
+            text-align: center;
+            color: #888;
+            margin-bottom: 40px;
+            font-size: 0.95rem;
+        }
+        .er-container {
+            display: flex;
+            flex-direction: column;
+            gap: 60px;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        .er-diagram {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 40px;
+            flex-wrap: wrap;
+        }
+        .entity {
+            background: #16213e;
+            border: 2px solid #00d4ff;
+            border-radius: 12px;
+            min-width: 220px;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0,212,255,0.15);
+        }
+        .entity-title {
+            background: linear-gradient(135deg, #00d4ff, #0066ff);
+            padding: 12px 16px;
+            font-weight: 700;
+            font-size: 1.05rem;
+            text-align: center;
+        }
+        .entity-table {
+            padding: 8px 0;
+        }
+        .attr {
+            display: flex;
+            align-items: center;
+            padding: 6px 14px;
+            font-size: 0.85rem;
+            gap: 8px;
+        }
+        .attr-name { color: #fff; }
+        .pk { color: #ffd700; font-weight: 600; }
+        .fk { color: #ff6b6b; }
+        .normal { color: #aaa; }
+        .type { color: #555; font-size: 0.75rem; }
+        .rel-line {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            min-width: 120px;
+        }
+        .rel-label {
+            background: #0f3460;
+            border: 1px solid #00d4ff;
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            color: #00d4ff;
+            text-align: center;
+        }
+        .rel-cardinality {
+            color: #888;
+            font-size: 0.75rem;
+        }
+        .arrow { color: #00d4ff; font-size: 1.4rem; }
+        .rels-section {
+            background: #16213e;
+            border: 2px solid #0f3460;
+            border-radius: 12px;
+            padding: 24px 30px;
+        }
+        .rels-title {
+            color: #00d4ff;
+            margin-bottom: 16px;
+            font-size: 1rem;
+        }
+        .rel-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 0;
+            border-bottom: 1px solid #0f3460;
+            font-size: 0.88rem;
+        }
+        .rel-item:last-child { border-bottom: none; }
+        .rel-from { color: #00d4ff; }
+        .rel-to { color: #ff6b6b; }
+        .rel-type { color: #ffd700; font-size: 0.75rem; }
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            color: #555;
+            font-size: 0.8rem;
+        }
+        @media (max-width: 768px) {
+            .er-diagram { flex-direction: column; }
+            .rel-line { transform: rotate(90deg); }
+        }
+    </style>
+</head>
+<body>
+    <h1>📊 粉丝社群平台 数据库设计</h1>
+    <p class="subtitle">SQLAlchemy ORM · SQLite · Mysql<br>四张核心表 · 七条关联关系</p>
+
+    <div class="er-container">
+
+        <!-- ER Diagram -->
+        <div class="er-diagram">
+            <!-- USERS -->
+            <div class="entity">
+                <div class="entity-title">👤 users</div>
+                <div class="entity-table">
+                    <div class="attr"><span class="pk">PK</span><span class="attr-name">id</span><span class="type">int</span></div>
+                    <div class="attr"><span class="normal">🔑</span><span class="attr-name">username</span><span class="type">varchar(50)</span></div>
+                    <div class="attr"><span class="normal">🔑</span><span class="attr-name">email</span><span class="type">varchar(100)</span></div>
+                    <div class="attr"><span class="normal">🔑</span><span class="attr-name">phone</span><span class="type">varchar(20)</span></div>
+                    <div class="attr"><span class="normal">🔒</span><span class="attr-name">hashed_password</span><span class="type">varchar(255)</span></div>
+                    <div class="attr"><span class="normal">   </span><span class="attr-name">nickname</span><span class="type">varchar(50)</span></div>
+                    <div class="attr"><span class="normal">   </span><span class="attr-name">avatar_url</span><span class="type">varchar(500)</span></div>
+                    <div class="attr"><span class="normal">   </span><span class="attr-name">bio</span><span class="type">varchar(200)</span></div>
+                    <div class="attr"><span class="normal">   </span><span class="attr-name">is_active</span><span class="type">boolean</span></div>
+                    <div class="attr"><span class="normal">   </span><span class="attr-name">is_superuser</span><span class="type">boolean</span></div>
+                    <div class="attr"><span class="normal">   </span><span class="attr-name">created_at</span><span class="type">datetime</span></div>
+                    <div class="attr"><span class="normal">   </span><span class="attr-name">updated_at</span><span class="type">datetime</span></div>
+                </div>
+            </div>
+
+            <div class="rel-line">
+                <div class="rel-label">1:N</div>
+                <div class="rel-cardinality">用户 → 帖子</div>
+                <div class="arrow">⟷</div>
+                <div class="rel-label">author_id</div>
+            </div>
+
+            <!-- POSTS -->
+            <div class="entity">
+                <div class="entity-title">📝 posts</div>
+                <div class="entity-table">
+                    <div class="attr"><span class="pk">PK</span><span class="attr-name">id</span><span class="type">int</span></div>
+                    <div class="attr"><span class="fk">FK</span><span class="attr-name">author_id</span><span class="type">→ users.id</span></div>
+                    <div class="attr"><span class="normal">   </span><span class="attr-name">title</span><span class="type">varchar(200)</span></div>
+                    <div class="attr"><span class="normal">   </span><span class="attr-name">content</span><span class="type">text</span></div>
+                    <div class="attr"><span class="normal">   </span><span class="attr-name">is_published</span><span class="type">boolean</span></div>
+                    <div class="attr"><span class="normal">   </span><span class="attr-name">view_count</span><span class="type">int</span></div>
+                    <div class="attr"><span class="normal">   </span><span class="attr-name">created_at</span><span class="type">datetime</span></div>
+                    <div class="attr"><span class="normal">   </span><span class="attr-name">updated_at</span><span class="type">datetime</span></div>
+                </div>
+            </div>
+
+            <div class="rel-line">
+                <div class="rel-label">1:N</div>
+                <div class="rel-cardinality">帖子 → 评论</div>
+                <div class="arrow">⟷</div>
+                <div class="rel-label">post_id</div>
+            </div>
+
+            <!-- COMMENTS -->
+            <div class="entity">
+                <div class="entity-title">💬 comments</div>
+                <div class="entity-table">
+                    <div class="attr"><span class="pk">PK</span><span class="attr-name">id</span><span class="type">int</span></div>
+                    <div class="attr"><span class="fk">FK</span><span class="attr-name">author_id</span><span class="type">→ users.id</span></div>
+                    <div class="attr"><span class="fk">FK</span><span class="attr-name">post_id</span><span class="type">→ posts.id</span></div>
+                    <div class="attr"><span class="fk">FK</span><span class="attr-name">parent_id</span><span class="type">→ comments.id</span></div>
+                    <div class="attr"><span class="normal">   </span><span class="attr-name">content</span><span class="type">text</span></div>
+                    <div class="attr"><span class="normal">   </span><span class="attr-name">created_at</span><span class="type">datetime</span></div>
+                    <div class="attr"><span class="normal">   </span><span class="attr-name">updated_at</span><span class="type">datetime</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="er-diagram">
+            <div class="entity">
+                <div class="entity-title">📝 posts</div>
+                <div class="entity-table">
+                    <div class="attr"><span class="pk">PK</span><span class="attr-name">id</span></div>
+                    <div class="attr"><span class="normal">...其他字段...</span></div>
+                </div>
+            </div>
+
+            <div class="rel-line">
+                <div class="rel-label">1:N</div>
+                <div class="rel-cardinality">帖子 → 点赞</div>
+                <div class="arrow">⟷</div>
+                <div class="rel-label">post_id</div>
+            </div>
+
+            <div class="entity">
+                <div class="entity-title">❤️ likes</div>
+                <div class="entity-table">
+                    <div class="attr"><span class="pk">PK</span><span class="attr-name">id</span><span class="type">int</span></div>
+                    <div class="attr"><span class="fk">FK</span><span class="attr-name">user_id</span><span class="type">→ users.id</span></div>
+                    <div class="attr"><span class="fk">FK</span><span class="attr-name">post_id</span><span class="type">→ posts.id</span></div>
+                    <div class="attr"><span class="normal">   </span><span class="attr-name">created_at</span><span class="type">datetime</span></div>
+                </div>
+            </div>
+
+            <div class="rel-line">
+                <div class="rel-label">N:1</div>
+                <div class="rel-cardinality">点赞 → 用户</div>
+                <div class="arrow">⟷</div>
+                <div class="rel-label">user_id</div>
+            </div>
+
+            <div class="entity">
+                <div class="entity-title">👤 users</div>
+                <div class="entity-table">
+                    <div class="attr"><span class="pk">PK</span><span class="attr-name">id</span></div>
+                    <div class="attr"><span class="normal">...其他字段...</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Relationships Detail -->
+        <div class="rels-section">
+            <div class="rels-title">🔗 关系说明 / Relationship Legend</div>
+            <div class="rel-item">
+                <span class="rel-from">users</span>
+                <span>→</span>
+                <span class="rel-to">posts</span>
+                <span class="rel-type">1:N</span>
+                <span>一个用户可以发多篇帖子，帖子只能属于一个作者</span>
+            </div>
+            <div class="rel-item">
+                <span class="rel-from">users</span>
+                <span>→</span>
+                <span class="rel-to">comments</span>
+                <span class="rel-type">1:N</span>
+                <span>一个用户可以发多条评论，评论只能属于一个作者</span>
+            </div>
+            <div class="rel-item">
+                <span class="rel-from">posts</span>
+                <span>→</span>
+                <span class="rel-to">comments</span>
+                <span class="rel-type">1:N</span>
+                <span>一篇帖子可以有多条评论，评论只能属于一篇帖子</span>
+            </div>
+            <div class="rel-item">
+                <span class="rel-from">comments</span>
+                <span>→</span>
+                <span class="rel-to">comments</span>
+                <span class="rel-type">1:N (自引用)</span>
+                <span>一条评论可以有多条回复（parent_id 自关联）</span>
+            </div>
+            <div class="rel-item">
+                <span class="rel-from">users</span>
+                <span>→</span>
+                <span class="rel-to">likes</span>
+                <span class="rel-type">1:N</span>
+                <span>一个用户可以对多篇帖子点赞</span>
+            </div>
+            <div class="rel-item">
+                <span class="rel-from">posts</span>
+                <span>→</span>
+                <span class="rel-to">likes</span>
+                <span class="rel-type">1:N</span>
+                <span>一篇帖子可以被多个用户点赞</span>
+            </div>
+            <div class="rel-item">
+                <span class="rel-from">users ∩ posts</span>
+                <span>→</span>
+                <span class="rel-to">likes</span>
+                <span class="rel-type">N:M (via likes)</span>
+                <span>likes 表实现用户与帖子的多对多关系（联合唯一约束 user_id+post_id）</span>
+            </div>
+        </div>
+
+        <div class="rels-section">
+            <div class="rels-title">⚠️ 约束说明 / Constraints</div>
+            <div class="rel-item">
+                <span class="rel-type">CASCADE 删除</span>
+                <span>用户删除 → 级联删除其所有帖子、评论、点赞</span>
+            </div>
+            <div class="rel-item">
+                <span class="rel-type">CASCADE 删除</span>
+                <span>帖子删除 → 级联删除其所有评论、点赞</span>
+            </div>
+            <div class="rel-item">
+                <span class="rel-type">UNIQUE</span>
+                <span>users.username / email / phone 唯一</span>
+            </div>
+            <div class="rel-item">
+                <span class="rel-type">INDEX</span>
+                <span>users.username, email, phone / posts.title, author_id / likes(user_id, post_id)</span>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="footer">
+        粉丝社群平台 · 数据库设计 · SQLAlchemy ORM<br>
+        ER 图自动生成 · 2026-04-17
+    </div>
+</body>
+</html>

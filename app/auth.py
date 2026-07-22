@@ -1,10 +1,11 @@
+import hashlib
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
+import bcrypt
 
 from app.config import get_settings
 from app.database import get_db
@@ -13,19 +14,29 @@ from app.schemas import TokenData
 
 settings = get_settings()
 
-# 密码加密上下文
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 # OAuth2 scheme（前端按 Authorization: Bearer <token> 方式传 token）
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
+def _prehash_password(password: str) -> bytes:
+    """
+    bcrypt 算法限制原始输入最长 72 字节。
+    先用 SHA256 对密码做预哈希，得到固定 32 字节的 digest，
+    再交给 bcrypt 处理，从而支持任意长度的密码。
+    """
+    return hashlib.sha256(password.encode("utf-8")).digest()
+
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    """验证明文密码与 bcrypt 哈希值是否匹配。"""
+    prehash = _prehash_password(plain_password)
+    return bcrypt.checkpw(prehash, hashed_password.encode("utf-8"))
 
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    """对密码进行 bcrypt 哈希（支持超过 72 字节的密码）。"""
+    prehash = _prehash_password(password)
+    return bcrypt.hashpw(prehash, bcrypt.gensalt()).decode("utf-8")
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:

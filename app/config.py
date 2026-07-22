@@ -3,6 +3,9 @@ from functools import lru_cache
 import secrets
 import os
 
+# 项目根目录（app/ 的上级目录）
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 
 class Settings(BaseSettings):
     # JWT 配置
@@ -11,8 +14,9 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 天
 
-    # 数据库
-    DATABASE_URL: str = "sqlite:///./fan_community.db"
+    # 数据库（使用绝对路径，确保 db 文件始终创建在后端项目的 data/ 目录下）
+    _db_path = os.path.join(BASE_DIR, "data", "fan_community.db")
+    DATABASE_URL: str = f"sqlite:///{_db_path}"
 
     # 图片上传配置
     UPLOAD_DIR: str = "uploads"                    # 图片存储目录

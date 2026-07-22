@@ -17,10 +17,11 @@ env/
 # Environment variables (contains secrets)
 .env
 
-# Database
+# Database (stored in data/ directory)
 *.db
 *.sqlite
 *.sqlite3
+data/
 
 # Uploaded files
 uploads/

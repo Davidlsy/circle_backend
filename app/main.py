@@ -32,6 +32,9 @@ from app.routers.fan_badge_router import router as fan_badge_router
 from app.routers.user_router import router as user_router
 from app.routers.circle_photo_router import router as circle_photo_router
 from app.routers.sticker_router import router as sticker_router
+# v2 新增：第三方登录 OAuth 路由
+from app.routers.oauth_router import router as oauth_router
+from app.routers.mock_oauth_router import router as mock_oauth_router
 from app.error_handlers import register_exception_handlers
 
 # 创建所有表
@@ -101,6 +104,9 @@ app.include_router(fan_badge_router)
 app.include_router(user_router)
 app.include_router(circle_photo_router)
 app.include_router(sticker_router)
+# v2 新增：第三方登录 OAuth 路由
+app.include_router(oauth_router)
+app.include_router(mock_oauth_router)
 
 # 静态文件：上传的图片（开发环境）
 # 生产环境建议使用 Nginx 或 CDN 代理

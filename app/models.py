@@ -94,6 +94,13 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan"
     )
+    # 第三方账号绑定（v2 新增）
+    oauth_accounts = relationship(
+        "OauthAccount",
+        foreign_keys="OauthAccount.user_id",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
     # 粉丝牌记录
     fan_badges = relationship(
         "FanBadge",
@@ -749,3 +756,31 @@ class PostTag(Base):
     # 关系
     post = relationship("Post", back_populates="tags")
     tag = relationship("Tag", back_populates="posts")
+
+
+class OauthAccount(Base):
+    """第三方账号绑定表（v2 新增）
+
+    用于记录本站用户与第三方平台（微信/抖音/支付宝）账号的绑定关系。
+    - 同一第三方账号不可重复绑定到不同本站用户（UNIQUE(provider, oauth_uid)）
+    - 一个本站用户可同时绑定多个平台（INDEX(user_id, provider)）
+    """
+    __tablename__ = "oauth_accounts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    provider = Column(String(20), nullable=False)        # wechat / douyin / alipay
+    oauth_uid = Column(String(100), nullable=False)      # 第三方用户唯一 ID
+    access_token = Column(String(500), nullable=True)    # 第三方 access_token
+    refresh_token = Column(String(500), nullable=True)   # 第三方 refresh_token（支付宝）
+    expires_at = Column(DateTime, nullable=True)         # 第三方 token 过期时间
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # 关系
+    user = relationship("User", back_populates="oauth_accounts")
+
+    __table_args__ = (
+        UniqueConstraint("provider", "oauth_uid", name="uq_provider_oauth_uid"),
+        Index("ix_user_provider", "user_id", "provider"),
+    )

@@ -54,6 +54,39 @@ class Settings(BaseSettings):
     SMTP_FROM: str = ""           # 发件人地址
     SMTP_USE_TLS: bool = True     # 是否使用 TLS
 
+    # ─── 第三方登录 OAuth 配置（v2 新增） ───
+    # Mock 模式开关：true=模拟 OAuth 流程，false=调用真实第三方接口
+    # 开发阶段推荐 true，生产环境必须 false
+    OAUTH_MOCK_MODE: bool = True
+
+    # 支付宝沙箱开关：true=使用支付宝沙箱环境
+    # 仅在 OAUTH_MOCK_MODE=true 时对支付宝生效（Mock 模式下支付宝优先走沙箱，否则走 Mock）
+    ALIPAY_SANDBOX: bool = False
+
+    # 前端回调地址（用于 OAuth 回调页与 Mock 授权页）
+    OAUTH_FRONTEND_URL: str = "http://localhost:5173"
+
+    # Mock 授权码有效期（秒），默认 5 分钟
+    OAUTH_MOCK_CODE_EXPIRE_SECONDS: int = 300
+
+    # 微信
+    WECHAT_CLIENT_ID: str = ""
+    WECHAT_CLIENT_SECRET: str = ""
+
+    # 抖音
+    DOUYIN_CLIENT_ID: str = ""
+    DOUYIN_CLIENT_SECRET: str = ""
+
+    # 支付宝（生产）
+    ALIPAY_APP_ID: str = ""
+    ALIPAY_APP_PRIVATE_KEY: str = ""
+    ALIPAY_PUBLIC_KEY: str = ""
+
+    # 支付宝沙箱
+    ALIPAY_SANDBOX_APP_ID: str = ""
+    ALIPAY_SANDBOX_APP_PRIVATE_KEY: str = ""
+    ALIPAY_SANDBOX_PUBLIC_KEY: str = ""
+
     class Config:
         env_file = ".env"
 
@@ -205,7 +238,33 @@ def get_settings() -> Settings:
         seed = f"fan_community_dev_{os.path.getmtime(__file__)}"
         settings.SECRET_KEY = secrets.token_hex(32)
 
+    # v2 新增：生产环境禁止开启 OAuth Mock 模式
+    validate_oauth_mock_mode(settings.OAUTH_MOCK_MODE, settings.ENV)
+
     return settings
+
+
+def validate_oauth_mock_mode(oauth_mock_mode: bool, env: str) -> None:
+    """
+    验证 OAuth Mock 模式配置的安全性
+
+    生产环境禁止开启 Mock 模式，否则会拒绝启动。
+
+    Args:
+        oauth_mock_mode: 是否开启 Mock 模式
+        env: 运行环境
+
+    Raises:
+        ValueError: 当生产环境开启 Mock 模式时
+    """
+    if env == "production" and oauth_mock_mode:
+        raise ValueError(
+            "生产环境错误：禁止开启 OAuth Mock 模式。\n"
+            "Mock 模式仅用于开发调试，会在没有真实第三方凭证的情况下"
+            "模拟整个 OAuth 流程，存在严重安全风险。\n"
+            "请在 .env 文件中设置 OAUTH_MOCK_MODE=false，"
+            "并配置真实的第三方平台凭证。"
+        )
 
 
 def get_cors_origins() -> list:

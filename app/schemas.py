@@ -1107,3 +1107,38 @@ class MyFanApplicationPublic(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ─── 第三方登录（v2 新增） ───
+
+class OAuthAuthorizeResponse(BaseModel):
+    """获取授权 URL 响应"""
+    authorize_url: str
+
+
+class OAuthCallbackRequest(BaseModel):
+    """OAuth 登录回调请求
+
+    code 字段：
+    - 微信/抖音：从授权页 query 中获取的 code
+    - 支付宝：从授权页 query 中获取的 auth_code
+    - Mock 模式：mock_{provider}_{account_index}_{timestamp}
+    """
+    code: str = Field(..., min_length=1, max_length=500)
+    state: str = Field(..., min_length=1, max_length=200)
+
+
+class OAuthBindRequest(BaseModel):
+    """OAuth 账号绑定请求（与回调结构一致，但需登录态）"""
+    code: str = Field(..., min_length=1, max_length=500)
+    state: str = Field(..., min_length=1, max_length=200)
+
+
+class OAuthBindingPublic(BaseModel):
+    """已绑定的第三方账号信息"""
+    provider: str
+    oauth_uid: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

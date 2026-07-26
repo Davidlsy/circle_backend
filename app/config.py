@@ -15,8 +15,10 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 天
 
     # 数据库（使用绝对路径，确保 db 文件始终创建在后端项目的 data/ 目录下）
+    # 代码默认值使用绝对路径；若 .env 显式配置则覆盖默认值
     _db_path = os.path.join(BASE_DIR, "data", "fan_community.db")
-    DATABASE_URL: str = f"sqlite:///{_db_path}"
+    _default_database_url: str = f"sqlite:///{_db_path}"
+    DATABASE_URL: str = _default_database_url
 
     # 图片上传配置
     UPLOAD_DIR: str = "uploads"                    # 图片存储目录
@@ -241,7 +243,76 @@ def get_settings() -> Settings:
     # v2 新增：生产环境禁止开启 OAuth Mock 模式
     validate_oauth_mock_mode(settings.OAUTH_MOCK_MODE, settings.ENV)
 
+    # DATABASE_URL 空值回退到代码默认绝对路径，避免 .env 中 DATABASE_URL= 时连接失败
+    if not settings.DATABASE_URL:
+        settings.DATABASE_URL = Settings._default_database_url
+
+    # SQLite 相对路径规范化：避免数据库文件随 CWD 漂移
+    settings.DATABASE_URL = normalize_sqlite_database_url(
+        settings.DATABASE_URL, settings.ENV
+    )
+
     return settings
+
+
+def normalize_sqlite_database_url(database_url: str, env: str) -> str:
+    """
+    规范化 SQLite 数据库 URL
+
+    若使用相对路径（如 sqlite:///./xxx.db），则转换为基于项目根目录的绝对路径，
+    避免数据库文件位置随启动时的工作目录（CWD）漂移。
+
+    生产环境强制要求使用 MySQL/PostgreSQL，禁止 SQLite。
+
+    Args:
+        database_url: 原始 DATABASE_URL
+        env: 运行环境
+
+    Returns:
+        str: 规范化后的 DATABASE_URL
+    """
+    # 非 SQLite 直接返回
+    if not database_url.startswith("sqlite"):
+        return database_url
+
+    # 生产环境禁止使用 SQLite
+    if env == "production":
+        raise ValueError(
+            "生产环境错误：禁止使用 SQLite。\n"
+            "SQLite 不支持并发写入，不适合多进程/多 worker 部署。\n"
+            "请在 .env 中配置 MySQL 或 PostgreSQL：\n"
+            "  DATABASE_URL=mysql+pymysql://user:password@host:3306/fan_community\n"
+            "  或\n"
+            "  DATABASE_URL=postgresql://user:password@host:5432/fan_community"
+        )
+
+    # 提取 SQLite 路径部分
+    # sqlite:///path/to/db.sqlite → path/to/db.sqlite
+    # sqlite:////absolute/path/db.sqlite → /absolute/path/db.sqlite
+    if database_url.startswith("sqlite:////"):
+        # 已经是绝对路径
+        return database_url
+    elif database_url.startswith("sqlite:///"):
+        path_part = database_url[len("sqlite:///"):]
+        # 若以 ./ 开头或不含绝对路径标识，则视为相对路径
+        if path_part.startswith("./") or not path_part.startswith("/"):
+            abs_path = os.path.normpath(os.path.join(BASE_DIR, path_part))
+            normalized = f"sqlite:///{abs_path}"
+            import warnings
+            warnings.warn(
+                f"数据库 URL 使用相对路径 '{database_url}'，"
+                f"已自动规范化为绝对路径 '{normalized}'。\n"
+                f"建议在 .env 中直接使用绝对路径以避免歧义。",
+                UserWarning,
+                stacklevel=2,
+            )
+            return normalized
+        return database_url
+    elif database_url.startswith("sqlite://"):
+        # 内存数据库或特殊形式，不处理
+        return database_url
+
+    return database_url
 
 
 def validate_oauth_mock_mode(oauth_mock_mode: bool, env: str) -> None:

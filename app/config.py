@@ -255,14 +255,44 @@ def get_settings() -> Settings:
     return settings
 
 
+def is_absolute_path(path: str) -> bool:
+    """
+    判断路径是否为绝对路径（兼容 Linux / Mac / Windows）
+
+    绝对路径的形式：
+    - Linux/Mac: 以 / 开头，如 /var/lib/...
+    - Windows:   以盘符开头，如 D:/... 或 D:\\...
+    - UNC 路径： 以 \\\\ 开头
+
+    Args:
+        path: 路径字符串
+
+    Returns:
+        bool: 是否为绝对路径
+    """
+    if not path:
+        return False
+    if path.startswith("/"):
+        return True
+    if path.startswith("\\"):
+        return True
+    if len(path) >= 2 and path[0].isalpha() and path[1] == ":":
+        return True
+    return False
+
+
 def normalize_sqlite_database_url(database_url: str, env: str) -> str:
     """
     规范化 SQLite 数据库 URL
 
-    若使用相对路径（如 sqlite:///./xxx.db），则转换为基于项目根目录的绝对路径，
-    避免数据库文件位置随启动时的工作目录（CWD）漂移。
+    核心逻辑：
+    1. 非 SQLite（MySQL/PostgreSQL）→ 直接返回
+    2. 生产环境使用 SQLite → 抛 ValueError
+    3. 内存数据库 → 直接返回
+    4. 相对路径 → 自动转换为基于项目根目录的绝对路径
+    5. 绝对路径（Unix/Windows/UNC）→ 保持原值
 
-    生产环境强制要求使用 MySQL/PostgreSQL，禁止 SQLite。
+    通过动态计算 BASE_DIR 确保数据库路径始终正确，不受启动时工作目录影响。
 
     Args:
         database_url: 原始 DATABASE_URL
@@ -271,11 +301,9 @@ def normalize_sqlite_database_url(database_url: str, env: str) -> str:
     Returns:
         str: 规范化后的 DATABASE_URL
     """
-    # 非 SQLite 直接返回
     if not database_url.startswith("sqlite"):
         return database_url
 
-    # 生产环境禁止使用 SQLite
     if env == "production":
         raise ValueError(
             "生产环境错误：禁止使用 SQLite。\n"
@@ -286,31 +314,23 @@ def normalize_sqlite_database_url(database_url: str, env: str) -> str:
             "  DATABASE_URL=postgresql://user:password@host:5432/fan_community"
         )
 
-    # 提取 SQLite 路径部分
-    # sqlite:///path/to/db.sqlite → path/to/db.sqlite
-    # sqlite:////absolute/path/db.sqlite → /absolute/path/db.sqlite
-    if database_url.startswith("sqlite:////"):
-        # 已经是绝对路径
+    if ":memory:" in database_url:
         return database_url
-    elif database_url.startswith("sqlite:///"):
+
+    if database_url.startswith("sqlite:///"):
         path_part = database_url[len("sqlite:///"):]
-        # 若以 ./ 开头或不含绝对路径标识，则视为相对路径
-        if path_part.startswith("./") or not path_part.startswith("/"):
+        if path_part and not is_absolute_path(path_part):
             abs_path = os.path.normpath(os.path.join(BASE_DIR, path_part))
             normalized = f"sqlite:///{abs_path}"
             import warnings
             warnings.warn(
                 f"数据库 URL 使用相对路径 '{database_url}'，"
-                f"已自动规范化为绝对路径 '{normalized}'。\n"
+                f"已自动规范化为绝对路径 '{normalized}'（基于项目根目录: {BASE_DIR}）。\n"
                 f"建议在 .env 中直接使用绝对路径以避免歧义。",
                 UserWarning,
                 stacklevel=2,
             )
             return normalized
-        return database_url
-    elif database_url.startswith("sqlite://"):
-        # 内存数据库或特殊形式，不处理
-        return database_url
 
     return database_url
 

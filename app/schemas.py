@@ -1142,3 +1142,17 @@ class OAuthBindingPublic(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class OAuthRegisterRequest(BaseModel):
+    """OAuth 第三方注册请求"""
+    code: str = Field(..., min_length=1, max_length=500)
+    state: str = Field(..., min_length=1, max_length=200)
+    username: str = Field(None, min_length=1, max_length=50)
+
+
+class OAuthRegisterResponse(BaseModel):
+    """OAuth 注册/登录响应"""
+    access_token: str
+    token_type: str = "bearer"
+    is_new_user: bool = False

@@ -180,7 +180,7 @@ def get_frontend_callback_path(provider: str) -> str:
 
 # ─── 授权 URL 生成 ───
 
-def build_authorize_url(provider: str, purpose: str = "login") -> str:
+def build_authorize_url(provider: str, purpose: str = "login") -> tuple[str, str]:
     """构建授权页 URL（Mock 模式返回本地 Mock 页 URL）。
 
     Args:
@@ -188,7 +188,7 @@ def build_authorize_url(provider: str, purpose: str = "login") -> str:
         purpose: login / bind
 
     Returns:
-        授权页 URL 字符串
+        (authorize_url, state) 元组
     """
     validate_provider(provider)
     settings = get_settings()
@@ -198,18 +198,19 @@ def build_authorize_url(provider: str, purpose: str = "login") -> str:
     if is_mock_mode(provider):
         mock_url = f"{settings.OAUTH_FRONTEND_URL.rstrip('/')}/mock/oauth/{provider}"
         params = urlencode({"state": state, "purpose": purpose})
-        logger.info(f"[MOCK] {provider} 授权 URL: {mock_url}?{params}")
-        return f"{mock_url}?{params}"
+        full_url = f"{mock_url}?{params}"
+        logger.info(f"[MOCK] {provider} 授权 URL: {full_url}")
+        return full_url, state
 
     # 真实模式：按平台拼接授权页 URL
     redirect_uri = f"{settings.OAUTH_FRONTEND_URL.rstrip('/')}{get_frontend_callback_path(provider)}"
 
     if provider == "wechat":
-        return _build_wechat_authorize_url(redirect_uri, state)
+        return _build_wechat_authorize_url(redirect_uri, state), state
     elif provider == "douyin":
-        return _build_douyin_authorize_url(redirect_uri, state)
+        return _build_douyin_authorize_url(redirect_uri, state), state
     elif provider == "alipay":
-        return _build_alipay_authorize_url(redirect_uri, state)
+        return _build_alipay_authorize_url(redirect_uri, state), state
 
     # 不可达
     raise HTTPException(status_code=400, detail=f"不支持的登录方式: {provider}")

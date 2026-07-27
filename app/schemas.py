@@ -1114,6 +1114,8 @@ class MyFanApplicationPublic(BaseModel):
 class OAuthAuthorizeResponse(BaseModel):
     """获取授权 URL 响应"""
     authorize_url: str
+    state: str
+    provider: str
 
 
 class OAuthCallbackRequest(BaseModel):

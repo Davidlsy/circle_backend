@@ -139,8 +139,8 @@ def oauth_authorize(provider: str, purpose: str = "login"):
             detail="purpose 参数仅支持 login / bind",
         )
 
-    authorize_url = build_authorize_url(provider, purpose=purpose)
-    return OAuthAuthorizeResponse(authorize_url=authorize_url)
+    authorize_url, state = build_authorize_url(provider, purpose=purpose)
+    return OAuthAuthorizeResponse(authorize_url=authorize_url, state=state, provider=provider)
 
 
 @router.post("/{provider}/callback", response_model=Token)

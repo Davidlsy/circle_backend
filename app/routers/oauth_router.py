@@ -24,8 +24,6 @@ from app.schemas import (
     OAuthCallbackRequest,
     OAuthBindRequest,
     OAuthBindingPublic,
-    OAuthRegisterRequest,
-    OAuthRegisterResponse,
 )
 from app.auth import (
     get_current_active_user,
@@ -139,8 +137,8 @@ def oauth_authorize(provider: str, purpose: str = "login"):
             detail="purpose 参数仅支持 login / bind",
         )
 
-    authorize_url, state = build_authorize_url(provider, purpose=purpose)
-    return OAuthAuthorizeResponse(authorize_url=authorize_url, state=state, provider=provider)
+    authorize_url = build_authorize_url(provider, purpose=purpose)
+    return OAuthAuthorizeResponse(authorize_url=authorize_url)
 
 
 @router.post("/{provider}/callback", response_model=Token)
@@ -155,18 +153,14 @@ def oauth_callback(
     1. 校验 state（CSRF 防护）
     2. 用 code 换取第三方用户信息
     3. 查找已绑定的本站用户 → 直接签发 JWT
-    4. 未绑定 → 返回错误（仅已注册或已绑定用户可登录）
-
-    注意：已移除自动注册功能，只有以下用户可通过第三方账号登录：
-    - 已通过第三方账号注册的用户
-    - 已绑定第三方账号的用户
+    4. 未绑定 → 自动创建本站账号 + 绑定 → 签发 JWT
     """
     validate_provider(provider)
     validate_state(payload.state, provider, purpose="login")
 
     oauth_info = exchange_code_for_user(payload.code, provider)
 
-    # 查找已绑定账号（只有已注册或已绑定的用户才能登录）
+    # 查找已绑定账号
     oauth_account = _find_oauth_account(db, oauth_info.provider, oauth_info.oauth_uid)
     if oauth_account:
         user = oauth_account.user
@@ -177,113 +171,12 @@ def oauth_callback(
         db.commit()
 
         mode_tag = "[MOCK] " if is_mock_mode(provider) else ""
-        logger.info(f"{mode_tag}OAuth 登录成功: user_id={user.id}, provider={provider}")
+        logger.info(f"{mode_tag}OAuth 登录成功(已存在): user_id={user.id}, provider={provider}")
         return _issue_jwt(user)
 
-    # 未绑定 → 拒绝登录（符合需求：仅已注册/已绑定用户可登录）
-    platform_name = PROVIDER_DISPLAY_NAME.get(provider, provider)
-    raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail=f"该{platform_name}账号未注册或未绑定本站账号，请先注册或绑定",
-    )
-
-
-@router.post("/{provider}/register", response_model=OAuthRegisterResponse)
-def oauth_register(
-    provider: str,
-    payload: OAuthRegisterRequest,
-    db: Session = Depends(get_db),
-):
-    """通过第三方账号注册本站账号
-
-    流程：
-    1. 校验 state（CSRF 防护）
-    2. 用 code 换取第三方用户信息
-    3. 校验该第三方账号未被其他用户绑定
-    4. 创建本站账号 + 绑定记录
-    5. 签发 JWT
-
-    如果该第三方账号已绑定，则直接登录（返回 is_new_user=False）
-
-    Args:
-        provider: 平台标识（wechat/douyin/alipay）
-        payload: 注册请求，包含 code、state 和可选的 username
-
-    Returns:
-        OAuthRegisterResponse: 包含 access_token 和 is_new_user 标识
-    """
-    validate_provider(provider)
-    validate_state(payload.state, provider, purpose="login")
-
-    oauth_info = exchange_code_for_user(payload.code, provider)
-
-    # 检查该第三方账号是否已绑定
-    existing_account = _find_oauth_account(db, oauth_info.provider, oauth_info.oauth_uid)
-    if existing_account:
-        # 已绑定 → 直接登录（与登录接口行为一致）
-        user = existing_account.user
-        existing_account.access_token = oauth_info.access_token
-        existing_account.refresh_token = oauth_info.refresh_token
-        existing_account.expires_at = oauth_info.expires_at
-        db.commit()
-
-        mode_tag = "[MOCK] " if is_mock_mode(provider) else ""
-        logger.info(f"{mode_tag}OAuth 注册(已存在): user_id={user.id}, provider={provider}")
-        return OAuthRegisterResponse(
-            access_token=create_access_token(data={"sub": user.id}),
-            token_type="bearer",
-            is_new_user=False,
-        )
-
-    # 检查用户名是否已存在（如果用户指定了用户名）
-    if payload.username:
-        if db.query(User).filter(User.username == payload.username).first():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="用户名已被使用",
-            )
-
-    # 创建新用户
-    base_username = payload.username or generate_username_for_oauth(oauth_info.provider, oauth_info.nickname)
-
-    username = base_username
-    suffix = 1
-    while db.query(User).filter(User.username == username).first():
-        suffix += 1
-        username = f"{base_username}_{suffix}"[:50]
-
-    user = User(
-        username=username,
-        nickname=oauth_info.nickname,
-        avatar_url=oauth_info.avatar,
-        hashed_password=hash_password(secrets.token_urlsafe(32)),
-    )
-    db.add(user)
-    db.flush()
-
-    # 创建 OAuth 绑定记录
-    oauth_account = OauthAccount(
-        user_id=user.id,
-        provider=oauth_info.provider,
-        oauth_uid=oauth_info.oauth_uid,
-        access_token=oauth_info.access_token,
-        refresh_token=oauth_info.refresh_token,
-        expires_at=oauth_info.expires_at,
-    )
-    db.add(oauth_account)
-    db.commit()
-    db.refresh(user)
-
-    mode_tag = "[MOCK] " if is_mock_mode(provider) else ""
-    logger.info(
-        f"{mode_tag}OAuth 注册成功: user_id={user.id}, username={user.username}, "
-        f"provider={oauth_info.provider}, oauth_uid={oauth_info.oauth_uid}"
-    )
-    return OAuthRegisterResponse(
-        access_token=create_access_token(data={"sub": user.id}),
-        token_type="bearer",
-        is_new_user=True,
-    )
+    # 首次登录：自动注册 + 绑定
+    user = _auto_register_user(db, oauth_info)
+    return _issue_jwt(user)
 
 
 @router.post("/{provider}/bind", response_model=Msg)
@@ -357,7 +250,16 @@ def oauth_unbind(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """解除第三方账号绑定"""
+    """解除第三方账号绑定
+
+    安全约束：如果该账户是通过第三方账号注册的，且仅剩此一种登录方式，
+    则不允许解绑（避免账号无法登录）。
+
+    判断规则：
+    - 用户有 email 或 phone（可用于本站登录/找回密码）→ 允许解绑
+    - 用户绑定了多个第三方平台 → 允许解绑
+    - 用户既无 email/phone，又仅剩当前一个第三方绑定 → 拒绝解绑
+    """
     validate_provider(provider)
 
     binding = _find_user_oauth_binding(db, current_user.id, provider)
@@ -366,6 +268,23 @@ def oauth_unbind(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"未绑定 {platform_name} 账号",
+        )
+
+    # 安全检查：判断用户是否有其他登录方式
+    has_local_login = bool(current_user.email or current_user.phone)
+    other_oauth_count = db.query(OauthAccount).filter(
+        OauthAccount.user_id == current_user.id,
+        OauthAccount.provider != provider,
+    ).count()
+
+    if not has_local_login and other_oauth_count == 0:
+        platform_name = PROVIDER_DISPLAY_NAME.get(provider, provider)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"解绑失败：该账号是通过{platform_name}注册的，且当前仅剩此一种登录方式。"
+                f"请先绑定邮箱/手机号或其他第三方平台后再解绑。"
+            ),
         )
 
     db.delete(binding)
